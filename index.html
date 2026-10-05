@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Kartzooka.io — Kart battle arena</title>
+  <meta name="description" content="Cartoon kart battles in your browser. Grab mystery boxes, blast rivals, and be the last kart driving. Works offline with smart AI drivers.">
+  <meta name="theme-color" content="#3aa8ff">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='22' width='52' height='24' rx='10' fill='%23ff4d4d'/%3E%3Ccircle cx='18' cy='48' r='8' fill='%23222'/%3E%3Ccircle cx='46' cy='48' r='8' fill='%23222'/%3E%3Ccircle cx='32' cy='16' r='10' fill='%23ffd2a8'/%3E%3C/svg%3E">
+  <!-- Only external host: jsDelivr (fonts fall back to system fonts if blocked) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/baloo-2@5/600.css" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/baloo-2@5/800.css" media="print" onload="this.media='all'">
+  <!-- Critical sizing inline: the page always fills its window/iframe and never scrolls -->
+  <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;position:fixed;inset:0;background:#8fd6ff}</style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/css/style.css">
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <!-- ================= HUD ================= -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="timer">3:00</div>
+      <div id="objective"></div>
+    </div>
+    <div id="board" class="panel-glass"></div>
+    <div id="killfeed"></div>
+    <div id="center-msg"></div>
+    <div id="toast-area"></div>
+    <div id="hud-bottom">
+      <div id="hp-wrap"><div id="hp-bar"><i></i></div><span id="hp-text">100</span></div>
+      <div id="weapon-slot" class="empty">
+        <div id="weapon-icon">?</div>
+        <div id="weapon-info"><b id="weapon-name">Grab a box!</b><span id="weapon-ammo"></span></div>
+        <kbd id="fire-key">SPACE</kbd>
+      </div>
+      <div id="my-stats"></div>
+    </div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="fps" class="hidden"></div>
+
+    <div id="touch" class="hidden">
+      <div id="joy-zone"></div>
+      <div id="joy-base"><div id="joy-knob"></div></div>
+      <button id="btn-drift" class="tbtn">DRIFT</button>
+      <button id="btn-fire" class="tbtn fire">FIRE</button>
+    </div>
+    <button id="pause-btn" aria-label="Pause">❚❚</button>
+  </div>
+
+  <!-- ================= MENU ================= -->
+  <div id="menu" class="overlay">
+    <button id="fs-btn" class="fs-btn" aria-label="Full screen" title="Full screen">⛶</button>
+    <div class="menu-wrap">
+      <header class="brand">
+        <h1 class="logo"><span>KART</span><span class="z">ZOOKA</span><small>.io</small></h1>
+        <p class="tag">Grab boxes. Blast rivals. Drive like a legend.</p>
+      </header>
+
+      <div id="menu-tabs" class="menu-tabs">
+        <button data-mt="setup" class="sel">🎮 Match</button>
+        <button data-mt="garage">🏎️ Garage</button>
+      </div>
+      <div class="menu-grid" data-show="setup">
+        <section class="card garage">
+          <h2>Your Kart</h2>
+          <canvas id="preview" width="260" height="200"></canvas>
+          <input id="nick" maxlength="14" placeholder="Enter your name" autocomplete="off" spellcheck="false" aria-label="Your name">
+          <div class="label">Color</div>
+          <div id="colors" class="swatches"></div>
+          <div class="garage-head"><span class="label">Garage</span><span id="coin-balance" class="coin-badge">🪙 0</span></div>
+          <div id="gtabs" class="gtabs"></div>
+          <div id="items" class="items"></div>
+          <div id="career" class="career"></div>
+        </section>
+
+        <section class="card setup">
+          <h2>Match Setup</h2>
+          <div class="label">Game mode</div>
+          <div id="modes" class="modes"></div>
+          <p id="mode-desc" class="desc"></p>
+          <div class="label">Arena</div>
+          <div id="maps" class="maps"></div>
+          <div class="row2">
+            <div>
+              <div class="label">Rivals: <b id="bots-val">5</b></div>
+              <input id="bots" type="range" min="1" max="8" step="1" value="5" aria-label="Number of AI rivals">
+            </div>
+            <div>
+              <div class="label">AI skill</div>
+              <div id="levels" class="seg"></div>
+            </div>
+          </div>
+          <div class="play-spacer"></div>
+          <button id="play" class="btn big">PLAY</button>
+          <div class="row-btns">
+            <button class="btn small ghost" data-modal="howto">How to play</button>
+            <button class="btn small ghost" data-modal="settings">Settings</button>
+          </div>
+        </section>
+      </div>
+      <footer class="foot">Works offline · No ads · No sign-up · Cartoon action, school friendly</footer>
+    </div>
+  </div>
+
+  <!-- ================= RESULTS ================= -->
+  <div id="results" class="overlay hidden">
+    <div class="card result-card">
+      <h2 id="res-title">Match Over</h2>
+      <p id="res-sub"></p>
+      <div id="res-earn" class="earn"></div>
+      <table id="res-table"></table>
+      <div class="row-btns">
+        <button id="again" class="btn big">PLAY AGAIN</button>
+      </div>
+      <div class="row-btns">
+        <button id="to-menu" class="btn small ghost">Main menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PAUSE ================= -->
+  <div id="pause" class="overlay hidden">
+    <div class="card pause-card">
+      <h2>Paused</h2>
+      <button id="resume" class="btn big">RESUME</button>
+      <div class="row-btns">
+        <button class="btn small ghost" data-modal="settings">Settings</button>
+        <button class="btn small ghost" data-modal="howto">How to play</button>
+      </div>
+      <button id="quit" class="btn small danger">Leave match</button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL ================= -->
+  <div id="modal" class="overlay hidden">
+    <div class="card modal-card">
+      <button class="close" aria-label="Close">✕</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="boot">Loading Kartzooka…</div>
+  <noscript><div id="noscript">Kartzooka needs JavaScript.</div></noscript>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/util.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/map.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/world.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/ai.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/platform.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/models.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/effects.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/render.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/tsubasamasa/zio@main/js/main.js"></script>
+</body>
+</html>
